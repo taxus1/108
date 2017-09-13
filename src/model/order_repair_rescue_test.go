@@ -153,39 +153,84 @@ func TestRepairOrderRescueDirect(t *testing.T) {
 	id = o.ID
 }
 
-func TestTriggerAcceptBy(t *testing.T) {
+// func TestTriggerAcceptBy(t *testing.T) {
+// 	o, err := LoadRepairRescueOrder(id)
+// 	checkErr(err)
+// 	fsm := NewRepairRescueFSM(o)
+//
+// 	r, err := LoadRepair(oilID)
+// 	checkErr(err)
+//
+// 	args := &gen.RescueAcceptArgs{
+// 		AcceptArgs: &gen.RescueGrabArgs{
+// 			Distance: 100.0,
+// 			Location: rescueLocation,
+// 		},
+// 	}
+// 	checkErr(o.TriggerAcceptBy(r, fsm, args), "技工接受救援订单失败")
+// 	assert(o.State == 3, fmt.Sprintf("技工接受救援订单状态错误 = %d, 实际 = %d", 3, o.State))
+// }
+//
+// func TestTriggerDriverCancel(t *testing.T) {
+// 	o, err := LoadRepairRescueOrder(id)
+// 	checkErr(err)
+// 	fsm := NewRepairRescueFSM(o)
+//
+// 	d, err := LoadDriver(driverID)
+// 	checkErr(err)
+//
+// 	r, err := LoadRepair(oilID)
+// 	checkErr(err)
+//
+// 	c, err := config.LoadOtherConf()
+// 	checkErr(err)
+//
+// 	res, err := LoadRescue(o.ID)
+// 	checkErr(err)
+//
+// 	args := &proto_order.OrderCancelArgs{
+// 		ProcessBase: &proto_order.ProcessBase{
+// 			Location: &proto_order.Location{
+// 				Lat:          99.552061,
+// 				Lng:          119.067990,
+// 				OrderAddress: "中国xxxxx路",
+// 			},
+// 		},
+// 	}
+// 	checkErr(o.TriggerDriverCancel(d, r, fsm, c, res, args), "司机取消救援订单失败")
+// 	assert(o.State == 9, fmt.Sprintf("机取消救援订单状态错误 = %d, 实际 = %d", 9, o.State))
+// }
+
+// func TestTriggerRepairCancel(t *testing.T) {
+// 	o, err := LoadRepairRescueOrder(id)
+// 	checkErr(err)
+// 	fsm := NewRepairRescueFSM(o)
+//
+// 	r, err := LoadRepair(oilID)
+// 	checkErr(err)
+//
+// 	c, err := config.LoadOtherConf()
+// 	checkErr(err)
+//
+// 	args := &proto_order.OrderCancelArgs{
+// 		ProcessBase: &proto_order.ProcessBase{
+// 			Location: &proto_order.Location{
+// 				Lat:          99.552061,
+// 				Lng:          119.067990,
+// 				OrderAddress: "中国xxxxx路",
+// 			},
+// 		},
+// 	}
+// 	checkErr(o.TriggerRepairCancel(r, fsm, c, args), "技工取消救援订单失败")
+// 	assert(o.State == 9, fmt.Sprintf("技工消救援订单状态错误 = %d, 实际 = %d", 9, o.State))
+// }
+
+func TestTriggerRejectBy(t *testing.T) {
 	o, err := LoadRepairRescueOrder(id)
 	checkErr(err)
 	fsm := NewRepairRescueFSM(o)
 
 	r, err := LoadRepair(oilID)
-	checkErr(err)
-
-	args := &gen.RescueAcceptArgs{
-		AcceptArgs: &gen.RescueGrabArgs{
-			Distance: 100.0,
-			Location: rescueLocation,
-		},
-	}
-	checkErr(o.TriggerAcceptBy(r, fsm, args), "技工接受救援订单失败")
-	assert(o.State == 3, fmt.Sprintf("技工接受救援订单状态错误 = %d, 实际 = %d", 3, o.State))
-}
-
-func TestTriggerDriverCancel(t *testing.T) {
-	o, err := LoadRepairRescueOrder(id)
-	checkErr(err)
-	fsm := NewRepairRescueFSM(o)
-
-	d, err := LoadDriver(driverID)
-	checkErr(err)
-
-	r, err := LoadRepair(oilID)
-	checkErr(err)
-
-	c, err := config.LoadOtherConf()
-	checkErr(err)
-
-	res, err := LoadRescue(o.ID)
 	checkErr(err)
 
 	args := &proto_order.OrderCancelArgs{
@@ -197,6 +242,6 @@ func TestTriggerDriverCancel(t *testing.T) {
 			},
 		},
 	}
-	checkErr(o.TriggerDriverCancel(d, r, fsm, c, res, args), "司机取消救援订单失败")
-	assert(o.State == 9, fmt.Sprintf("机取消救援订单状态错误 = %d, 实际 = %d", 9, o.State))
+	checkErr(o.TriggerRejectBy(r, fsm, args), "技工拒绝救援订单失败")
+	assert(o.State == 9, fmt.Sprintf("技工拒绝援订单状态错误 = %d, 实际 = %d", 9, o.State))
 }

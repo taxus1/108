@@ -1,0 +1,82 @@
+// protoc --go_out=Morder.proto=ocenter/src/proto_order:.  repair/repair.proto
+
+syntax = "proto3";
+
+package proto.repair;
+
+import "order.proto";
+
+
+
+// RepairCreateArgs 创建订单参数
+message RepairCreateArgs {
+
+  // 下单基本
+  int64 repairID = 1;
+
+  // 操作订单时的坐标
+  proto_order.Location location = 2;
+
+  // 附加费
+  int64 extra = 3;
+
+  // 下单到技工之间的直线距离
+  float distance = 4;
+
+  repeated proto_order.OrderInfo orderInfos = 5;
+
+}
+
+// OrderCreateResult 创建订单返回信息
+message OrderCreateResult {
+  // 订单ID
+  int64 orderID = 1;
+
+  // 订单状态
+  int32 state = 2;
+}
+
+// OrderBargainParams 议价参数
+message OrderBargainArgs {
+
+  // 订单流程基本参数 orderId, lat, lng, orderAddress
+  proto_order.ProcessBase ProcessBase = 1;
+
+  // 自定义设置的金额
+  proto_order.CustomerPrice CustomerPrice = 2;
+
+  repeated proto_order.OrderInfo orderInfos = 3;
+}
+
+// OrderConfirmeArgs 确认参数
+message OrderConfirmeArgs {
+
+  // 订单流程基本参数 orderId, lat, lng, orderAddress
+  proto_order.ProcessBase ProcessBase = 1;
+}
+
+// OrderRunArgs 出发中参数
+message OrderRunArgs {
+
+  // 订单流程基本参数 orderId, lat, lng, orderAddress
+  proto_order.ProcessBase ProcessBase = 1;
+}
+
+// OrderHandArgs 修理中参数
+message OrderHandArgs {
+
+  // 订单流程基本参数 orderId, lat, lng, orderAddress
+  proto_order.ProcessBase ProcessBase = 1;
+}
+
+// OrderFinishArgs 订单完成参数
+message OrderFinishArgs {
+
+  // 订单流程基本参数 orderId, lat, lng, orderAddress
+  proto_order.ProcessBase ProcessBase = 1;
+
+  // 自定义设置的金额
+  proto_order.CustomerPrice CustomerPrice = 2;
+
+  repeated proto_order.OrderInfo orderInfos = 3;
+}

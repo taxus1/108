@@ -1,0 +1,79 @@
+// protoc --go_out=Morder.proto=ocenter/src/proto_order:.  rescue/rescue.proto
+
+syntax = "proto3";
+
+package proto.rescue;
+
+import "order.proto";
+
+
+// RepairRescueArgs 维修救援参数
+message RepairRescueArgs {
+
+  // 下单司机ID，对应数据库user_id
+  int64 driverID = 1;
+
+  // 操作订单时的坐标
+  proto_order.Location location = 2;
+
+  repeated proto_order.OrderInfo orderInfos = 3;
+
+}
+
+// DirectRescueArgs 针对维修厂直接救援参数
+message DirectRescueArgs {
+
+  // 技工ID
+  int64 repairID = 1;
+
+  // 技工和司机直线距离
+  float distance = 2;
+
+  // 救援基本参数
+  RepairRescueArgs rescueArgs = 3;
+}
+
+// RescueCompleteArgs 完善救援订单参数
+message RescueCompleteArgs {
+
+  // 技工ID
+  int64 orderID = 1;
+
+  // 技工和司机直线距离
+  float distance = 2;
+
+  repeated string image = 3;
+
+  // 自定义设置的金额
+  proto_order.CustomerPrice CustomerPrice = 4;
+
+  // 操作订单时的坐标
+  proto_order.Location location = 5;
+
+  repeated proto_order.OrderInfo orderInfos = 6;
+}
+
+// RescueGrabArgs 救援订单抢单参数
+message RescueGrabArgs {
+
+  // 技工ID
+  int64 orderID = 1;
+
+  // 技工和司机直线距离
+  float distance = 2;
+
+  // 操作订单时的坐标
+  proto_order.Location location = 5;
+}
+
+// RescueAcceptArgs 救援订单接受单参数
+message RescueAcceptArgs {
+
+  RescueGrabArgs acceptArgs = 1;
+}
+
+// RescueRejectArgs 救援订单p2p拒绝接单参数
+message RescueRejectArgs {
+
+  RescueGrabArgs rejectArgs = 1;
+}

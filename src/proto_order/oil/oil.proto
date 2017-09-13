@@ -1,0 +1,24 @@
+//protoc --go_out=Morder.proto=ocenter/src/proto_order:.  oil/oil.proto
+
+syntax = "proto3";
+
+package proto.oil;
+
+import "order.proto";
+
+
+// OilCreateArgs 创建加油订单参数
+message OilCreateArgs {
+
+  // 下单基本
+  int64 repairID = 1;
+
+  // 操作订单时的坐标
+  proto_order.Location location = 2;
+
+  // 油枪编号
+  string oilGun = 3;
+
+  proto_order.OrderInfo orderInfo = 4;
+
+}

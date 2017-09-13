@@ -1,0 +1,26 @@
+// protoc --go_out=Morder.proto=ocenter/src/proto_order:.  insurance/insurance.proto
+
+syntax = "proto3";
+
+package proto.insurance;
+
+import "order.proto";
+
+// InsuranceRescueArgs 保险救援参数
+message InsuranceRescueArgs {
+
+  // 技工ID
+  int64 repairID = 1;
+
+  // 操作订单时的坐标
+  proto_order.Location location = 2;
+
+  // 下单到技工之间的直线距离
+  float distance = 3;
+
+  // 参保公司
+  string insurer = 4;
+
+  // 事故现场照片
+  repeated string imgs = 5;
+}

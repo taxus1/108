@@ -32,13 +32,13 @@ func NewRepairRescueOrder() *RepairRescueOrder {
 
 // LoadRepairRescueOrder 加载已有订单
 func LoadRepairRescueOrder(id int64) (*RepairRescueOrder, error) {
-	o := &RepairRescueOrder{}
+	o := &RepairRescueOrder{RepairOrder: &RepairOrder{Order: &Order{OrderSchema: &OrderSchema{}}}}
 	o.ID = id
 	if err := o.load(); err != nil {
 		return nil, err
 	}
 	oi, err := LoadOrderImage(id)
-	if err != nil {
+	if err != nil && err != sql.ErrNoRows {
 		return nil, err
 	}
 	o.OrderImage = oi
@@ -124,54 +124,11 @@ func (o *RepairRescueOrder) rescue(d *Driver, fsm *RepairRescueFSM, c *config.Ot
 	return nil
 }
 
-// TriggerCompleteBy 技工触发完成修理
-func (o *RepairRescueOrder) TriggerCompleteBy(r *Repair, fsm *RepairRescueFSM, args *gen.RescueCompleteArgs) error {
-	if err := fsm.Event(r.Finish()); err != nil {
-		return err
-	}
-
-	o.OrderInfos = o.newInfo(args.GetOrderInfos())
-	if err := o.setAmount(o.getCalculator(args.GetCustomerPrice().Extra, args.GetCustomerPrice().AccessoriesFee)); err != nil {
-		return err
-	}
-	o.setCustomerPrice(args.GetCustomerPrice().Extra, args.GetCustomerPrice().AccessoriesFee)
-
-	o.modify(fsm.Current(), args.GetLocation(), time.Now())
-	o.OrderLogs = o.newLog(r.ID)
-	o.OrderImage.SetImg(args.Image)
-	return o.updateFinish(r)
-}
-
-func (o *RepairRescueOrder) updateFinish(r *Repair) error {
-	return db.TxExec(func(tx *sql.Tx) error {
-		if err := o.updatePriceChange(tx); err != nil {
-			return err
-		}
-
-		if err := o.OrderImage.update(tx); err != nil {
-			return err
-		}
-
-		// 技工设为接单中
-		return r.SetToWork(tx)
-	})
-}
-
 // TriggerGrabBy 触发技工抢单
-func (o *RepairRescueOrder) TriggerGrabBy(r *Repair, fsm *RepairRescueFSM, args *gen.RescueGrabArgs) error {
+func (o *RepairRescueOrder) TriggerGrabBy(r *Repair, fsm *RepairRescueFSM, c *config.GrabConf, g *Rescue, args *gen.RescueGrabArgs) error {
 	o.setRepair(r)
-
+	fsm.Repair = r
 	if err := fsm.Event(r.Grab()); err != nil {
-		return err
-	}
-
-	c, err := config.LoadGrabConf()
-	if err != nil {
-		return err
-	}
-
-	g, err := LoadRescue(o.ID)
-	if err != nil {
 		return err
 	}
 
@@ -203,9 +160,46 @@ func (o *RepairRescueOrder) updateGrab(g *Rescue, r *Repair) error {
 	})
 }
 
+// TriggerCompleteBy 技工触发完成修理
+func (o *RepairRescueOrder) TriggerCompleteBy(r *Repair, fsm *RepairRescueFSM, args *gen.RescueCompleteArgs) error {
+	if err := fsm.Event(r.Finish()); err != nil {
+		return err
+	}
+
+	o.OrderInfos = o.newInfo(args.GetOrderInfos())
+	if err := o.setAmount(NewRepairCalculator(o.OrderInfos, args.GetCustomerPrice().Extra, args.GetCustomerPrice().AccessoriesFee)); err != nil {
+		return err
+	}
+	o.setCustomerPrice(args.GetCustomerPrice().Extra, args.GetCustomerPrice().AccessoriesFee)
+
+	o.modify(fsm.Current(), args.GetLocation(), time.Now())
+	o.OrderLogs = o.newLog(r.ID)
+
+	oi := &OrderImage{}
+	oi.SetImg(args.Image)
+	o.OrderImage = oi
+	return o.updateFinish(r)
+}
+
+func (o *RepairRescueOrder) updateFinish(r *Repair) error {
+	return db.TxExec(func(tx *sql.Tx) error {
+		if err := o.updatePriceChange(tx); err != nil {
+			return err
+		}
+
+		if err := o.OrderImage.update(tx); err != nil {
+			return err
+		}
+
+		// 技工设为接单中
+		return r.SetToWork(tx)
+	})
+}
+
 // TriggerAcceptBy 触发技工接单
 func (o *RepairRescueOrder) TriggerAcceptBy(r *Repair, fsm *RepairRescueFSM, args *gen.RescueAcceptArgs) error {
 	o.setRepair(r)
+	fsm.Repair = r
 	if err := fsm.Event(r.Accept()); err != nil {
 		return err
 	}
@@ -232,7 +226,7 @@ func (o *RepairRescueOrder) updateAccept(r *Repair) error {
 }
 
 // TriggerDriverCancel 订单取消
-func (o *RepairRescueOrder) TriggerDriverCancel(d *Driver, r *Repair, fsm *RepairRescueFSM, c *config.OtherConf, args *proto_order.OrderCancelArgs) error {
+func (o *RepairRescueOrder) TriggerDriverCancel(d *Driver, r *Repair, fsm *RepairRescueFSM, c *config.OtherConf, res *Rescue, args *proto_order.OrderCancelArgs) error {
 	times := d.dailyAvailCancel(c.DriverCancelTimes)
 	if times == 0 {
 		return ErrCancelNoTimes
@@ -244,37 +238,38 @@ func (o *RepairRescueOrder) TriggerDriverCancel(d *Driver, r *Repair, fsm *Repai
 	}
 
 	if fee > 0 {
-		if err := fsm.Event(d.CancelFee()); err != nil {
-			return err
-		}
-		o.Amount = fee
-
-		o.modify(fsm.Current(), args.GetProcessBase().GetLocation(), time.Now())
-
-		o.OrderLogs = o.newLog(r.ID)
-		g := &OrderInfo{
-			OrderInfoSchema: &OrderInfoSchema{
-				GoodsID:  g.ID,
-				Price:    g.Price,
-				Name:     "里程费",
-				Amount:   dis,
-				InfoType: o.Type,
-			},
-		}
-		o.OrderInfos = &OrderInfos{g}
-		o.cancelWithFee(r)
-	} else {
-		cf := func(tx *sql.Tx) error {
-			r, err := LoadRescue(o.ID)
-			if err != nil {
-				return err
-			}
-			return r.Cancel(tx)
-
-		}
-		return o.cancel(d.Cancel(), d.ID, r, fsm, args, cf)
+		return o.cancelWithFee(d, r, fsm, args.GetProcessBase().GetLocation(), fee, g, dis)
 	}
-	return nil
+	return o.cancelNoFee(d, r, fsm, res, args.GetProcessBase().GetLocation())
+}
+
+func (o *RepairRescueOrder) cancelWithFee(d *Driver, r *Repair, fsm *RepairRescueFSM, location *proto_order.Location, fee int64, g *Goods, dis float32) error {
+	if err := fsm.Event(d.CancelFee()); err != nil {
+		return err
+	}
+	o.Amount = fee
+
+	o.modify(fsm.Current(), location, time.Now())
+
+	o.OrderLogs = o.newLog(r.ID)
+	oi := &OrderInfo{
+		OrderInfoSchema: &OrderInfoSchema{
+			GoodsID:  g.ID,
+			Price:    g.Price,
+			Name:     "里程费",
+			Amount:   dis,
+			InfoType: o.Type,
+		},
+	}
+	o.OrderInfos = &OrderInfos{oi}
+	return o.updateCancelWithFee(r)
+}
+
+func (o *RepairRescueOrder) cancelNoFee(d *Driver, r *Repair, fsm *RepairRescueFSM, res *Rescue, location *proto_order.Location) error {
+	cf := func(tx *sql.Tx) error {
+		return res.Cancel(tx)
+	}
+	return o.cancel(d.Cancel(), d.ID, r, fsm, location, cf)
 }
 
 // TriggerRepairCancel 订单取消
@@ -292,21 +287,21 @@ func (o *RepairRescueOrder) TriggerRepairCancel(r *Repair, fsm *RepairRescueFSM,
 
 		return r.Cancel(tx)
 	}
-	return o.cancel(r.Cancel(), r.ID, r, fsm, args, cf)
+	return o.cancel(r.Cancel(), r.ID, r, fsm, args.GetProcessBase().GetLocation(), cf)
 }
 
-func (o *RepairRescueOrder) cancel(event string, operator int64, r *Repair, fsm *RepairRescueFSM, args *proto_order.OrderCancelArgs, cfs ...func(tx *sql.Tx) error) error {
+func (o *RepairRescueOrder) cancel(event string, operator int64, r *Repair, fsm *RepairRescueFSM, location *proto_order.Location, cfs ...func(tx *sql.Tx) error) error {
 	if err := fsm.Event(event); err != nil {
 		return err
 	}
 
-	o.modify(fsm.Current(), args.GetProcessBase().GetLocation(), time.Now())
+	o.modify(fsm.Current(), location, time.Now())
 
 	o.OrderLogs = o.newLog(operator)
 	return o.updateCancel(r, cfs...)
 }
 
-func (o *RepairRescueOrder) cancelWithFee(r *Repair) error {
+func (o *RepairRescueOrder) updateCancelWithFee(r *Repair) error {
 	return db.TxExec(func(tx *sql.Tx) error {
 		if err := o.updatePriceChange(tx); err != nil {
 			return err
@@ -319,7 +314,7 @@ func (o *RepairRescueOrder) cancelWithFee(r *Repair) error {
 
 // TriggerRejectBy P2P订单拒绝接单
 func (o *RepairRescueOrder) TriggerRejectBy(r *Repair, fsm *RepairRescueFSM, args *proto_order.OrderCancelArgs) error {
-	return o.cancel(r.Cancel(), r.ID, r, fsm, args)
+	return o.cancel(r.Cancel(), r.ID, r, fsm, args.GetProcessBase().GetLocation())
 }
 
 func (o *RepairRescueOrder) updateCancel(r *Repair, cfs ...func(tx *sql.Tx) error) error {
@@ -402,7 +397,7 @@ func (o *RepairRescueOrder) isCancel() bool {
 }
 
 func (o *RepairRescueOrder) updateGrabeInfo(tx *sql.Tx) error {
-	sqlStr := "UPDATE orders SET repair_id = ? org_id = ?, status = ?, distance= ? WHERE id = ?"
+	sqlStr := "UPDATE orders SET repair_id = ?, org_id = ?, status = ?, distance= ? WHERE id = ?"
 	if _, err := db.UpdateTx(tx, sqlStr, o.RepairID, o.RepairOrgID, o.State, o.Distance, o.ID); err != nil {
 		return err
 	}

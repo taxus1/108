@@ -2,6 +2,7 @@ package model
 
 import (
 	"database/sql"
+	"fmt"
 	"ocenter/src/db"
 	"ocenter/src/model/config"
 
@@ -84,7 +85,7 @@ func NewRescue(o *RepairRescueOrder) *Rescue {
 
 // LoadRescue 加载订单救援信息
 func LoadRescue(orderID int64) (*Rescue, error) {
-	sqlStr := `SELECT * FROM resuces WHERE order_id = ?`
+	sqlStr := `SELECT id, driver_id, status, create_time FROM rescues WHERE order_id = ?`
 	r := &Rescue{RescueSchema: &RescueSchema{OrderID: orderID}}
 	err := db.DbSource.QueryRow(sqlStr, orderID).Scan(
 		&r.ID,
@@ -92,8 +93,8 @@ func LoadRescue(orderID int64) (*Rescue, error) {
 		&r.State,
 		&r.CreateTime,
 	)
-	if err != nil {
-		return nil, err
+	if err != nil && err != sql.ErrNoRows {
+		return nil, fmt.Errorf("load rescue error: %v", err)
 	}
 	return r, nil
 }

@@ -2,6 +2,7 @@ package model
 
 import (
 	"database/sql"
+	"fmt"
 	"ocenter/src/db"
 	"time"
 )
@@ -58,20 +59,27 @@ func LoadGoods(orgID int64) (*Goods, error) {
         LIMIT 1
   `
 	g := &Goods{GoodsSchema: &GoodsSchema{}}
-	err := db.DbSource.QueryRow(sqlStr, orgID).Scan(g.fields()...)
+	fields := g.fields()
+	err := db.DbSource.QueryRow(sqlStr, orgID).Scan(fields...)
 	if err != nil && err != sql.ErrNoRows {
-		return nil, err
+		return nil, fmt.Errorf("[load goods error] %v", err)
 	}
+	price := fields[3].(*int64)
+	g.Price = int64(*price)
+
+	benefit := fields[14].(*float64)
+	g.Benefit = int64(*benefit)
 	return g, nil
 }
 
 func (g *Goods) fields() []interface{} {
+	var price, benefit float64
 	return []interface{}{
 		&g.ID,
 		&g.Name,
 		&g.BrandID,
 		&g.ModelID,
-		&g.Price,
+		&price,
 		&g.Info,
 		&g.OrgID,
 		&g.IsGoods,
@@ -81,6 +89,6 @@ func (g *Goods) fields() []interface{} {
 		&g.StripeID,
 		&g.Status,
 		&g.UpdateTime,
-		&g.Benefit,
+		&benefit,
 	}
 }

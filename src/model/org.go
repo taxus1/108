@@ -1,6 +1,7 @@
 package model
 
 import (
+	"fmt"
 	"ocenter/src/db"
 	"time"
 )
@@ -57,9 +58,10 @@ func LoadOrg(id int64) (*Org, error) {
 		o.id = ?
   `
 	o := &Org{ID: id}
-	err := db.DbSource.QueryRow(sqlStr, id).Scan(
+	chargeAmount := 0.0
+	err := db.DbSource.QueryRow(sqlStr, id, id).Scan(
 		&o.OilChargeType,
-		&o.OilChargeAmount,
+		&chargeAmount,
 		&o.State,
 		&o.Manager,
 		&o.Trailer,
@@ -70,6 +72,10 @@ func LoadOrg(id int64) (*Org, error) {
 		&o.ConfirmAt,
 		&o.UnhandInsuranceOrders,
 	)
+	o.OilChargeAmount = int64(chargeAmount)
+	if err != nil {
+		err = fmt.Errorf("[LoadOrg] %v", err)
+	}
 	return o, err
 }
 
